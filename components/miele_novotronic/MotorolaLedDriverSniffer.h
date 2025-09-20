@@ -1,21 +1,23 @@
+#pragma once
+
 #include "esphome.h"
+#include "esphome/core/component.h"
 #include "esphome/components/text_sensor/text_sensor.h"
 
 #include <sstream>
 
-namespace esphome {
+namespace miele_novotronic {
 
-class MC14489Pin : public esp8266::ESP8266GPIOPin {
+class MC14489Pin : public esphome::esp8266::ESP8266GPIOPin {
 public:
     MC14489Pin(const MC14489Pin&) = default;
-    MC14489Pin(uint8_t pin, gpio::Flags flags, bool inverted = false) {
+    MC14489Pin(uint8_t pin, esphome::gpio::Flags flags, bool inverted = false) {
         set_pin(pin);
         set_flags(flags);
         set_inverted(inverted);
     }
 
-
-    using esp8266::ESP8266GPIOPin::attach_interrupt;
+    using esphome::esp8266::ESP8266GPIOPin::attach_interrupt;
 };
 
 template <typename T, size_t N>
@@ -73,7 +75,7 @@ private:
 
 class MC14489 {
 public:
-    MC14489(uint8_t csPin, MC14489Pin* data) : _data(*data), _cs(csPin, gpio::FLAG_INPUT, true) {
+    MC14489(uint8_t csPin, MC14489Pin* data) : _data(*data), _cs(csPin, esphome::gpio::FLAG_INPUT, true) {
     }
 
     MC14489(const MC14489&) = delete;
@@ -81,7 +83,7 @@ public:
 
     void setup() {
         _cs.setup();
-        _cs.attach_interrupt(&handleChipSelect, this, gpio::INTERRUPT_ANY_EDGE);
+        _cs.attach_interrupt(&handleChipSelect, this, esphome::gpio::INTERRUPT_ANY_EDGE);
     }
 
     static void ICACHE_RAM_ATTR HOT handleChipSelect(void* self) {
@@ -170,12 +172,12 @@ private:
     ConsensusBuffer<uint8_t> _ctrlReg;
 };
 
-class MotorolaLedDriverSniffer : public Component, public esphome::text_sensor::TextSensor {
+class MotorolaLedDriverSniffer : public esphome::Component, public esphome::text_sensor::TextSensor {
 
 public:
-    MotorolaLedDriverSniffer(text_sensor::TextSensor* timeOutput, text_sensor::TextSensor* stateOutput)
-        : _data(14, gpio::FLAG_INPUT) // D5
-        , _clk(12, gpio::FLAG_INPUT) // D6
+    MotorolaLedDriverSniffer(esphome::text_sensor::TextSensor* timeOutput, esphome::text_sensor::TextSensor* stateOutput)
+        : _data(14, esphome::gpio::FLAG_INPUT) // D5
+        , _clk(12, esphome::gpio::FLAG_INPUT) // D6
         , _left(4, &_data) // D2
         , _right(5, &_data) // D1
         , _timeOutput(timeOutput)
@@ -204,7 +206,7 @@ public:
         _left.setup();
         _right.setup();
 
-        _clk.attach_interrupt(&handleClk, this, gpio::INTERRUPT_RISING_EDGE);
+        _clk.attach_interrupt(&handleClk, this, esphome::gpio::INTERRUPT_RISING_EDGE);
     }
 
     using DisplayArray = std::array<char, 3>;
@@ -332,15 +334,6 @@ public:
             case 0x10: states.emplace_back("Ø No"); break;
         }
 
-        // TODO: debounce blinking
-        // if (rdispreg & 0x800) {
-        //     states.emplace_back("Delayed start");
-        //     // TODO: if delayed start and progress is 0, then read the delayed start setting off of ldispreg
-        // }
-        // if (rdispreg & 0x200) {
-        //     states.emplace_back("Soak");
-        // }
-
         if (rdispreg & 0x100) {
             states.emplace_back("Pre-wash");
         }
@@ -362,11 +355,10 @@ public:
             str << state;
         }
 
-        // str << std::hex << "R:" << rdispreg << "," << int(rctrlreg) << " L:" << _left.getDisplayReg() << "," << int(_left.getCtrlReg());
         return str.str();
     }
 
-    static void publishNew(text_sensor::TextSensor* sensor, std::string newState) {
+    static void publishNew(esphome::text_sensor::TextSensor* sensor, std::string newState) {
         if (sensor->state != newState) {
             sensor->publish_state(std::move(newState));
         }
@@ -375,16 +367,13 @@ public:
     void loop() override {
         publishNew(_timeOutput, formatTime());
         publishNew(_stateOutput, formatState());
-
-        // ESP_LOGI("sniffer", "Left: display=%x ctrl=%x DU=%d CU=%d", _left.getDisplayReg(), _left.getCtrlReg(), _left.displayUpdates, _left.ctrlUpdates);
-        // ESP_LOGI("sniffer", "Right: display=%x ctrl=%x  DU=%d CU=%d", _right.getDisplayReg(), _right.getCtrlReg(), _right.displayUpdates, _right.ctrlUpdates);
     }
 
     MC14489Pin _data, _clk;
     MC14489 _left, _right;
 
-    text_sensor::TextSensor* _timeOutput;
-    text_sensor::TextSensor* _stateOutput;
+    esphome::text_sensor::TextSensor* _timeOutput;
+    esphome::text_sensor::TextSensor* _stateOutput;
 };
 
-}
+}  // namespace miele_novotronic
